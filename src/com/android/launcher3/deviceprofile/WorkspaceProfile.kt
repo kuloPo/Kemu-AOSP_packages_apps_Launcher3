@@ -82,6 +82,37 @@ data class WorkspaceProfile(
     val extraSpace: Int = 0,
 ) {
 
+    /** Uses the full workspace area when there is no search row or hotseat. */
+    fun forFlatWorkspace(inv: InvariantDeviceProfile, device: DeviceProperties): WorkspaceProfile {
+        val margin = max(edgeMarginPx, desiredWorkspaceHorizontalMarginPx)
+        val padding =
+            Rect(margin, edgeMarginPx, margin, edgeMarginPx + workspacePageIndicatorHeight)
+        val cell =
+            calculateCellSize(
+                cellLayoutBorderSpacePx = Point(),
+                panelCount = 1,
+                deviceProperties = device,
+                numColumns = inv.numColumns,
+                numRows = inv.numRows,
+                cellLayoutPadding = Rect(),
+                totalWorkspacePadding =
+                    Point(padding.left + padding.right, padding.top + padding.bottom),
+            )
+        return copy(
+            workspacePadding = padding,
+            cellLayoutPaddingPx = Rect(),
+            cellLayoutBorderSpacePx = Point(),
+            cellSize = cell,
+            cellWidthPx = cell.x,
+            cellHeightPx = cell.y,
+            cellYPaddingPx = -1,
+            panelCount = 1,
+            iconCenterVertically = true,
+            isLabelHidden = false,
+            workspaceContentScale = 1f,
+        )
+    }
+
     fun getTotalWorkspacePadding(): Point =
         Point(
             workspacePadding.left + workspacePadding.right,

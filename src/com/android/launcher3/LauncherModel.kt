@@ -28,6 +28,7 @@ import com.android.launcher3.logging.DumpManager.LauncherDumpable
 import com.android.launcher3.model.AllAppsList
 import com.android.launcher3.model.BaseLauncherBinder.BaseLauncherBinderFactory
 import com.android.launcher3.model.BgDataModel
+import com.android.launcher3.model.FlatWorkspaceUpdateQueue
 import com.android.launcher3.model.ItemInstallQueue
 import com.android.launcher3.model.LoaderTask
 import com.android.launcher3.model.LoaderTask.LoaderTaskFactory
@@ -95,6 +96,50 @@ constructor(
     private var mModelLoaded = false
     private var mModelDestroyed = false
 
+    private val flatWorkspace = FlatWorkspace.isEnabled(context)
+    private val flatUpdates =
+        FlatWorkspaceUpdateQueue(
+            MODEL_EXECUTOR.handler,
+            this::isModelLoaded,
+            { task -> task.execute(taskControllerProvider.get(), mBgDataModel, mBgAllAppsList) },
+            this::reconcileFlatWorkspace,
+        )
+
+    private fun reconcileFlatWorkspace(packages: Set<PackageUserKey>, profileChanged: Boolean) {
+        if (mModelDestroyed) return
+        if (profileChanged) {
+            forceReload()
+            return
+        }
+        val users = UserCache.getInstance(context).userManagerState.getAllCachedInfos()
+        val visibleUsers =
+            users
+                .filter { it.isUnlocked && !it.isQuietModeEnabled && !it.iconInfo.isPrivate }
+                .map { it.iconInfo.user }
+                .toSet()
+        val requiresReload =
+            synchronized(mBgDataModel) {
+                packages.any { key ->
+                    if (key.mUser !in visibleUsers) return@any false
+                    val apps =
+                        mBgAllAppsList.data
+                            .filter { it.user == key.mUser && it.targetPackage == key.mPackageName }
+                            .map { it.targetComponent }
+                            .toSet()
+                    val icons =
+                        mBgDataModel.itemsIdMap
+                            .filter {
+                                it.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION &&
+                                    it.user == key.mUser &&
+                                    it.targetPackage == key.mPackageName
+                            }
+                            .map { it.targetComponent }
+                    apps != icons.toSet() || apps.size != icons.size
+                }
+            }
+        if (requiresReload) forceReload()
+    }
+
     fun isModelLoaded() =
         synchronized(mLock) { mModelLoaded && mLoaderTask == null && !mModelDestroyed }
 
@@ -121,7 +166,12 @@ constructor(
         lifecycle.addCloseable(dumpManager.register(this))
     }
 
-    fun newModelCallbacks() = ModelLauncherCallbacks(this::enqueueModelUpdateTask)
+    fun newModelCallbacks() =
+        if (flatWorkspace) {
+            ModelLauncherCallbacks(flatUpdates::enqueueTask, flatUpdates::packagesChanged)
+        } else {
+            ModelLauncherCallbacks(this::enqueueModelUpdateTask)
+        }
 
     fun getWriter(
         verifyChanges: Boolean,
@@ -137,6 +187,7 @@ constructor(
     /** Called when the model is destroyed */
     fun destroy() {
         mModelDestroyed = true
+        flatUpdates.close()
         MODEL_EXECUTOR.execute { modelDelegate.destroy() }
     }
 
@@ -146,6 +197,15 @@ constructor(
      * @see UserCache.addUserEventListener
      */
     fun onUserEvent(user: UserHandle, action: String) {
+        if (
+            flatWorkspace &&
+                (action == UserCache.ACTION_PROFILE_UNLOCKED ||
+                    action == UserCache.ACTION_PROFILE_AVAILABLE ||
+                    action == Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+        ) {
+            flatUpdates.profileChanged()
+            return
+        }
         when (action) {
             Intent.ACTION_MANAGED_PROFILE_AVAILABLE -> {
                 if (mShouldReloadWorkProfile) {
@@ -349,6 +409,7 @@ constructor(
                 }
                 mIsLoaderTaskRunning = false
             }
+            if (flatWorkspace) flatUpdates.onModelReady()
         }
     }
 

@@ -149,6 +149,11 @@ public final class Utilities {
     @Deprecated
     public static final boolean IS_DEBUG_DEVICE = BuildConfig.IS_DEBUG_DEVICE;
 
+    /** Returns whether the product reserves the first workspace row for search. */
+    public static boolean qsbOnFirstScreen(Context context) {
+        return !FlatWorkspace.isEnabled(context) && qsbOnFirstScreen();
+    }
+
     public static boolean qsbOnFirstScreen() {
         return !injectableModelItems() && BuildConfig.QSB_ON_FIRST_SCREEN;
     }

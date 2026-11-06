@@ -75,8 +75,8 @@ public class DeleteDropTarget extends ButtonDropTarget {
             return canRemove(info);
         }
 
-        return (info instanceof LauncherAppWidgetInfo)
-                || (info instanceof CollectionInfo);
+        return !FlatWorkspace.isEnabled(getContext())
+                && ((info instanceof LauncherAppWidgetInfo) || (info instanceof CollectionInfo));
     }
 
     @Override
@@ -97,7 +97,8 @@ public class DeleteDropTarget extends ButtonDropTarget {
 
     @Override
     protected boolean supportsDrop(ItemInfo info) {
-        return true;
+        return !FlatWorkspace.isEnabled(getContext()) || canRemove(info)
+                || info.id == ItemInfo.NO_ID;
     }
 
     /**
@@ -114,6 +115,9 @@ public class DeleteDropTarget extends ButtonDropTarget {
     }
 
     private boolean canRemove(ItemInfo item) {
+        if (!FlatWorkspace.canRemoveItem(getContext(), item)) {
+            return false;
+        }
         return item.id != ItemInfo.NO_ID;
     }
 

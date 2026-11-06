@@ -96,6 +96,11 @@ public interface StatefulContainer<STATE_TYPE extends BaseState<STATE_TYPE>> ext
      */
     boolean shouldAnimateStateChange();
 
+    /** Maps a requested state to one supported by this container. */
+    default STATE_TYPE resolveState(STATE_TYPE state) {
+        return state;
+    }
+
     default void handleConfigurationChanged(Configuration configuration){
         //no op
     }

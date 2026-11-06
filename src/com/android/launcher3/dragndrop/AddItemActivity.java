@@ -56,6 +56,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseActivity;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
@@ -124,7 +125,11 @@ public class AddItemActivity extends BaseActivity
         super.onCreate(savedInstanceState);
 
         mRequest = PinRequestHelper.getPinItemRequest(getIntent());
-        if (mRequest == null) {
+        if (mRequest == null || (FlatWorkspace.isEnabled(this)
+                && (mRequest.getRequestType() != PinItemRequest.REQUEST_TYPE_SHORTCUT
+                    || !FlatWorkspace.isPackageVisible(this,
+                            mRequest.getShortcutInfo().getPackage(),
+                            mRequest.getShortcutInfo().getUserHandle())))) {
             finish();
             return;
         }

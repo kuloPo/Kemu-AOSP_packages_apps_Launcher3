@@ -84,6 +84,7 @@ public class Hotseat extends CellLayout implements Insettable {
 
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mHasVerticalHotseat;
+    private boolean mFlatWorkspace;
     private Workspace<?> mWorkspace;
     private boolean mSendTouchToWorkspace;
     private final MultiValueAlpha mIconsAlphaChannels;
@@ -105,6 +106,7 @@ public class Hotseat extends CellLayout implements Insettable {
 
     public Hotseat(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        mFlatWorkspace = FlatWorkspace.isEnabled(context);
         if (Flags.enableQsbOnHotseat()) {
             mQsb = LayoutInflater.from(context).inflate(R.layout.qsb_container_hotseat, this,
                     false);
@@ -125,6 +127,10 @@ public class Hotseat extends CellLayout implements Insettable {
                 VIEW_TRANSLATE_X, ICONS_TRANSLATION_X_CHANNELS_COUNT, Float::sum);
         mQsbAlphaChannels = new MultiValueAlpha(mQsb, ALPHA_CHANNEL_CHANNELS_COUNT);
         mQsbAlphaChannels.setUpdateVisibility(true);
+        if (mFlatWorkspace) {
+            setVisibility(GONE);
+            setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        }
     }
 
     /** Provides translation X for hotseat icons for the channel. */
@@ -154,6 +160,11 @@ public class Hotseat extends CellLayout implements Insettable {
 
     boolean isHasVerticalHotseat() {
         return mHasVerticalHotseat;
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(mFlatWorkspace ? GONE : visibility);
     }
 
     public void resetLayout(boolean hasVerticalHotseat) {

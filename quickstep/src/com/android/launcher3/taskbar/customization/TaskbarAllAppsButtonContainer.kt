@@ -27,6 +27,7 @@ import android.view.ViewConfiguration
 import androidx.annotation.DimenRes
 import androidx.annotation.DrawableRes
 import androidx.core.view.setPadding
+import com.android.launcher3.FlatWorkspace
 import com.android.launcher3.R
 import com.android.launcher3.Utilities.dpToPx
 import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
@@ -46,6 +47,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     IconButtonView(context, attrs), TaskbarContainer {
 
     private val activityContext: TaskbarActivityContext = ActivityContext.lookupContext(context)
+    private val flatWorkspace = FlatWorkspace.isEnabled(context)
     private var allAppsTouchTriggered = false
     private var allAppsTouchRunnable: Runnable? = null
     private var allAppsButtonTouchDelayMs: Long = ViewConfiguration.getLongPressTimeout().toLong()
@@ -54,6 +56,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     override val spaceNeeded: Int
         get() {
+            if (flatWorkspace) return 0
             return dpToPx(
                 activityContext.taskbarSpecsEvaluator.taskbarIconSize.size.toFloat(),
                 activityContext,
@@ -63,6 +66,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     init {
         contentDescription = context.getString(R.string.all_apps_button_label)
         setUpIcon()
+        if (flatWorkspace) visibility = GONE
+    }
+
+    override fun setVisibility(visibility: Int) {
+        super.setVisibility(if (flatWorkspace) GONE else visibility)
     }
 
     @SuppressLint("UseCompatLoadingForDrawables", "ResourceAsColor")

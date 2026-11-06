@@ -41,16 +41,20 @@ import java.util.function.Consumer
  * Implementation of {@link LauncherApps#Callbacks} which converts various events to corresponding
  * model tasks
  */
-class ModelLauncherCallbacks(private var taskExecutor: Consumer<ModelUpdateTask>) :
-    LauncherApps.Callback(), InstallSessionTracker.Callback {
+class ModelLauncherCallbacks(
+    private var taskExecutor: Consumer<ModelUpdateTask>,
+    private val onPackageListChanged: (List<String>, UserHandle) -> Unit = { _, _ -> },
+) : LauncherApps.Callback(), InstallSessionTracker.Callback {
 
     override fun onPackageAdded(packageName: String, user: UserHandle) {
         FileLog.d(TAG, "onPackageAdded triggered for packageName=$packageName, user=$user")
         taskExecutor.accept(PackageUpdatedTask(OP_ADD, user, packageName))
+        onPackageListChanged(listOf(packageName), user)
     }
 
     override fun onPackageChanged(packageName: String, user: UserHandle) {
         taskExecutor.accept(PackageUpdatedTask(OP_UPDATE, user, packageName))
+        onPackageListChanged(listOf(packageName), user)
     }
 
     override fun onPackageLoadingProgressChanged(
@@ -64,6 +68,7 @@ class ModelLauncherCallbacks(private var taskExecutor: Consumer<ModelUpdateTask>
     override fun onPackageRemoved(packageName: String, user: UserHandle) {
         FileLog.d(TAG, "onPackageRemoved triggered for packageName=$packageName, user=$user")
         taskExecutor.accept(PackageTaskFactory.appsRemoved(user, setOf(packageName)))
+        onPackageListChanged(listOf(packageName), user)
     }
 
     override fun onPackagesAvailable(
@@ -72,6 +77,7 @@ class ModelLauncherCallbacks(private var taskExecutor: Consumer<ModelUpdateTask>
         replacing: Boolean,
     ) {
         taskExecutor.accept(PackageUpdatedTask(OP_UPDATE, user, *packageNames))
+        onPackageListChanged(packageNames.toList(), user)
     }
 
     override fun onPackagesSuspended(vararg packageNames: String, user: UserHandle) {
@@ -103,6 +109,7 @@ class ModelLauncherCallbacks(private var taskExecutor: Consumer<ModelUpdateTask>
     fun onPackagesRemoved(user: UserHandle, packages: List<String>) {
         FileLog.d(TAG, "package removed received " + TextUtils.join(",", packages))
         taskExecutor.accept(PackageTaskFactory.appsRemoved(user, packages.toSet()))
+        onPackageListChanged(packages, user)
     }
 
     override fun onSessionFailure(packageName: String, user: UserHandle) {

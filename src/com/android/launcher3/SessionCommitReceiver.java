@@ -106,6 +106,9 @@ public class SessionCommitReceiver extends BroadcastReceiver {
      * - Home Settings preference to add App Icons on Home Screen is set as disabled
      */
     public static boolean isEnabled(Context context, UserHandle user) {
+        if (FlatWorkspace.isEnabled(context)) {
+            return false;
+        }
         if (Flags.privateSpaceRestrictItemDrag() && user != null
                 && UserCache.getInstance(context).getUserInfo(user).isPrivate()) {
             return false;

@@ -31,6 +31,7 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.AbstractFloatingViewHelper;
 import com.android.launcher3.DropTargetHandler;
 import com.android.launcher3.Flags;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.SecondaryDropTarget;
@@ -136,6 +137,7 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
     }
 
     public static final Factory<ActivityContext> WIDGETS = (context, itemInfo, originalView) -> {
+        if (FlatWorkspace.isEnabled(originalView.getContext())) return null;
         final PackageUserKey packageUserKey = PackageUserKey.fromItemInfo(itemInfo);
         if (packageUserKey == null) return null;
 
@@ -256,7 +258,10 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
         }
     }
 
-    public static final Factory<ActivityContext> REMOVE = RemoveApp::new;
+    public static final Factory<ActivityContext> REMOVE =
+            (activity, itemInfo, originalView) ->
+                    FlatWorkspace.canRemoveItem(originalView.getContext(), itemInfo)
+                            ? new RemoveApp<>(activity, itemInfo, originalView) : null;
 
     public static class RemoveApp<T extends ActivityContext> extends SystemShortcut<T> {
 

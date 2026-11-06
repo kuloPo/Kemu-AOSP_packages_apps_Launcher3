@@ -105,7 +105,8 @@ class PackageTaskFactoryTest {
 
         mockTaskController = spy((context.appComponent as TestComponent).getTaskController())
 
-        whenever(mockAppFilter.shouldShowApp(expectedComponent)).thenReturn(true)
+        whenever(mockAppFilter.shouldShowApp(expectedComponent, mockApplicationInfo))
+            .thenReturn(true)
         mockApplicationInfo.apply {
             uid = 1
             isArchived = false

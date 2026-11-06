@@ -213,9 +213,14 @@ public class ModelDbController {
         clearFlagEmptyDbCreated();
     }
 
-    /**
-     * Generates an id to be used for new item in the favorites table
-     */
+    /** Returns the name of the database currently used by this model. */
+    @WorkerThread
+    public String getDatabaseName() {
+        createDbIfNotExists();
+        return mOpenHelper.getDatabaseName();
+    }
+
+    /** Generates an id to be used for a new item in the favorites table. */
     @WorkerThread
     public int generateNewItemId() {
         createDbIfNotExists();

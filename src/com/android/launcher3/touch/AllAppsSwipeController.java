@@ -145,6 +145,9 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
 
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
+        if (mLauncher.getDeviceProfile().isFlatWorkspace) {
+            return false;
+        }
         if (mCurrentAnimation != null) {
             // If we are already animating from a previous state, we can intercept.
             return true;

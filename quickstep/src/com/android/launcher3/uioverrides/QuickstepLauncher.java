@@ -121,6 +121,7 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.GestureNavContract;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
@@ -1702,7 +1703,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     }
 
     public boolean isCanShowAllAppsEducationView() {
-        return mCanShowAllAppsEducationView;
+        return !FlatWorkspace.isEnabled(this) && mCanShowAllAppsEducationView;
     }
 
     public void setCanShowAllAppsEducationView(boolean canShowAllAppsEducationView) {

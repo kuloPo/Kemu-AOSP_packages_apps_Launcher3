@@ -19,6 +19,7 @@ package com.android.launcher3.popup
 import android.content.Context
 import android.view.View
 import com.android.launcher3.AppWidgetResizeFrame
+import com.android.launcher3.FlatWorkspace
 import com.android.launcher3.R
 import com.android.launcher3.dragndrop.LauncherDragController
 import com.android.launcher3.model.data.ItemInfo
@@ -35,8 +36,9 @@ class PopupControllerForExtraHomeScreenItems<T>(
     private val popupDataRepository: PopupDataRepository,
     private val dragController: LauncherDragController,
 ) : PopupController<T> where T : Context, T : ActivityContext {
-    override fun show(view: View): Popup {
+    override fun show(view: View): Popup? {
         val itemInfo = view.tag as ItemInfo
+        if (!FlatWorkspace.canRemoveItem(view.context, itemInfo)) return null
         val activityContext: ActivityContext = ActivityContext.lookupContext<T>(view.context)
         val container =
             PopupContainer.create<T>(

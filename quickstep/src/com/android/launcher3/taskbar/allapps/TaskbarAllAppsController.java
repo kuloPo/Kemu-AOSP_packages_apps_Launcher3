@@ -27,6 +27,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.R;
 import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.dragndrop.DragOptions.PreDragCondition;
@@ -41,6 +42,7 @@ import com.android.launcher3.views.BaseDragLayer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
 /**
  * Handles the all apps overlay window initialization, updates, and its data.
  * <p>
@@ -164,6 +166,9 @@ public final class TaskbarAllAppsController {
     }
 
     private void show(boolean animate, boolean showKeyboard) {
+        if (FlatWorkspace.isEnabled(mControllers.taskbarActivityContext)) {
+            return;
+        }
         if (mAppsView != null) {
             return;
         }

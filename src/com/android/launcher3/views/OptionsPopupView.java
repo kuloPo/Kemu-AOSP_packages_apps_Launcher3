@@ -42,6 +42,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
@@ -212,25 +213,27 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                 R.drawable.ic_palette,
                 IGNORE,
                 OptionsPopupView::startWallpaperPicker));
-        if (WIDGETS_ENABLED) {
+        if (WIDGETS_ENABLED && !FlatWorkspace.isEnabled(launcher)) {
             options.add(new OptionItem(launcher,
                     R.string.widget_button_text,
                     R.drawable.ic_widget,
                     LAUNCHER_WIDGETSTRAY_BUTTON_TAP_OR_LONGPRESS,
                     OptionsPopupView::onWidgetsClicked));
         }
-        if (MULTI_SELECT_EDIT_MODE.get()) {
+        if (MULTI_SELECT_EDIT_MODE.get() && !FlatWorkspace.isEnabled(launcher)) {
             options.add(new OptionItem(launcher,
                     R.string.edit_home_screen,
                     R.drawable.enter_home_gardening_icon,
                     LAUNCHER_SETTINGS_BUTTON_TAP_OR_LONGPRESS,
                     OptionsPopupView::enterHomeGardening));
         }
-        options.add(new OptionItem(launcher,
-                R.string.all_apps_button_label,
-                R.drawable.ic_apps,
-                LAUNCHER_ALL_APPS_TAP_OR_LONGPRESS,
-                OptionsPopupView::enterAllApps));
+        if (!FlatWorkspace.isEnabled(launcher)) {
+            options.add(new OptionItem(launcher,
+                    R.string.all_apps_button_label,
+                    R.drawable.ic_apps,
+                    LAUNCHER_ALL_APPS_TAP_OR_LONGPRESS,
+                    OptionsPopupView::enterAllApps));
+        }
         options.add(new OptionItem(launcher,
                 R.string.settings_button_text,
                 R.drawable.ic_setting,
@@ -256,6 +259,9 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
     }
 
     private static boolean onWidgetsClicked(View view) {
+        if (FlatWorkspace.isEnabled(view.getContext())) {
+            return false;
+        }
         return Launcher.getLauncher(view.getContext()).openWidgetPicker();
     }
 

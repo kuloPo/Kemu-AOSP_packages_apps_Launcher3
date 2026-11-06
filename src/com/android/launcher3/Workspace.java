@@ -406,7 +406,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         // Set insets for page indicator
         Rect padding = grid.mWorkspaceProfile.getWorkspacePadding();
-        if (grid.isVerticalBarLayout()) {
+        if (FlatWorkspace.isEnabled(getContext())) {
+            lp.leftMargin = lp.rightMargin = 0;
+            lp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+            lp.bottomMargin = mInsets.bottom;
+        } else if (grid.isVerticalBarLayout()) {
             lp.leftMargin = padding.left + grid.mWorkspaceProfile.getWorkspaceCellPaddingXPx();
             lp.rightMargin = padding.right + grid.mWorkspaceProfile.getWorkspaceCellPaddingXPx();
             lp.bottomMargin = padding.bottom;
@@ -554,7 +558,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     private boolean isTwoPanelEnabled() {
-        return !FOLDABLE_SINGLE_PAGE.get() && mLauncher.mDeviceProfile.getDeviceProperties().isTwoPanels();
+        return !FlatWorkspace.isEnabled(getContext()) && !FOLDABLE_SINGLE_PAGE.get()
+                && mLauncher.mDeviceProfile.getDeviceProperties().isTwoPanels();
     }
 
     public void deferRemoveExtraEmptyScreen() {
@@ -651,7 +656,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     public void bindAndInitFirstWorkspaceScreen() {
         // Add the first page
         CellLayout firstPage = insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, getChildCount());
-        if (!qsbOnFirstScreen()) {
+        if (!qsbOnFirstScreen(getContext())) {
             mFirstPagePinnedItem = null;
             return;
         }
@@ -2680,6 +2685,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     private boolean shouldUseHotseatAsDropLayout(DragObject dragObject) {
+        if (FlatWorkspace.isEnabled(getContext())) {
+            return false;
+        }
         if (mLauncher.getHotseat() == null
                 || mLauncher.getHotseat().getShortcutsAndWidgets() == null
                 || isDragWidget(dragObject)) {

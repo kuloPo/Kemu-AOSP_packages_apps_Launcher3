@@ -29,6 +29,7 @@ import android.util.Pair;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.icons.IconCache;
@@ -88,13 +89,21 @@ public class AddWorkspaceItemsTask implements ModelUpdateTask {
         }
 
         final ArrayList<ItemInfo> addedItemsFinal = new ArrayList<>();
-        final IntSet excludedScreens = IntSet.wrap(FIRST_SCREEN_ID);
         final Context context = taskController.getContext();
+        final IntSet excludedScreens = FlatWorkspace.isEnabled(context)
+                ? new IntSet() : IntSet.wrap(FIRST_SCREEN_ID);
 
         synchronized (dataModel) {
             List<ItemInfo> filteredItems = new ArrayList<>();
             for (Pair<ItemInfo, Object> entry : mItemList) {
                 ItemInfo item = entry.first;
+                if (FlatWorkspace.isEnabled(context)
+                        && (item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
+                            || item instanceof LauncherAppWidgetInfo
+                            || !FlatWorkspace.isPackageVisible(
+                                    context, item.getTargetPackage(), item.user))) {
+                    continue;
+                }
                 if (item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
                     // Short-circuit this logic if the icon exists somewhere on the workspace
                     if (shortcutExists(dataModel, item.getIntent(), item.user)) {

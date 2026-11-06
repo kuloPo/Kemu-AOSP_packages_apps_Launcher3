@@ -58,7 +58,6 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
-
 /**
  * Stores the list of all applications for the all apps view.
  */
@@ -155,7 +154,7 @@ public class AllAppsList {
     }
 
     public void add(AppInfo info, LauncherActivityInfo activityInfo, boolean loadIcon) {
-        if (!mAppFilter.shouldShowApp(info.componentName)) {
+        if (!mAppFilter.shouldShowApp(info.componentName, activityInfo.getApplicationInfo())) {
             return;
         }
         if (data.stream().anyMatch(it ->

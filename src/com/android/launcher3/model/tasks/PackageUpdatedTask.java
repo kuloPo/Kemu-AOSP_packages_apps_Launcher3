@@ -34,6 +34,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.android.launcher3.Flags;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.icons.IconCache;
@@ -296,6 +297,10 @@ public class PackageUpdatedTask implements ModelUpdateTask {
             // Remove any queued items from the install queue
             ItemInstallQueue.INSTANCE.get(context)
                     .removeFromInstallQueue(removedPackages, mUser);
+        }
+
+        if (FlatWorkspace.isEnabled(context)) {
+            return;
         }
 
         if (!mIsUpdate) {

@@ -206,6 +206,7 @@ import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.PredictedContainerInfo;
 import com.android.launcher3.model.data.WorkspaceData;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.pageindicators.PageIndicatorDots;
 import com.android.launcher3.pageindicators.PaginationArrow;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.popup.ArrowPopup;
@@ -1129,6 +1130,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
         // When multiple pages are visible or desktop devices, show persistent page indicator
         mWorkspace.getPageIndicator().setShouldAutoHide(!state.hasFlag(FLAG_MULTI_PAGE)
+                && !FlatWorkspace.isEnabled(this)
                 && !shouldEnableMouseInteractionChanges(mWorkspace.getContext()));
 
         mPrevLauncherState = mStateManager.getCurrentStableState();
@@ -1264,14 +1266,17 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         SparseArray<Parcelable> widgetsState =
                 savedState.getSparseParcelableArray(RUNTIME_STATE_WIDGET_PANEL);
-        if (widgetsState != null) {
+        if (widgetsState != null && !FlatWorkspace.isEnabled(this)) {
             WidgetsFullSheet.show(this, false).restoreHierarchyState(widgetsState);
         }
     }
 
-    /**
-     * Finds all the views we need and configure them properly.
-     */
+    @Override
+    public LauncherState resolveState(LauncherState state) {
+        return mDeviceProfile.isFlatWorkspace && state == ALL_APPS ? NORMAL : state;
+    }
+
+    /** Finds and configures the launcher views. */
     protected void setupViews() {
         if (allAppsBlur()) {
             getTheme().applyStyle(getAllAppsBlurStyleResId(), true);
@@ -1284,6 +1289,16 @@ public class Launcher extends StatefulActivity<LauncherState>
         mFocusHandler = mDragLayer.getFocusIndicatorHelper();
         mWorkspace = mDragLayer.findViewById(R.id.workspace);
         mWorkspace.initParentViews(mDragLayer);
+        if (FlatWorkspace.isEnabled(this)
+                && mWorkspace.getPageIndicator() instanceof PageIndicatorDots dots) {
+            dots.getLayoutParams().height = ViewGroup.LayoutParams.MATCH_PARENT;
+            dots.setPageSwipeTarget(mWorkspace);
+            dots.setOnPageClickListener(page -> {
+                if (isInState(NORMAL) && !isWorkspaceLocked() && !mDragController.isDragging()) {
+                    mWorkspace.snapToPage(page);
+                }
+            });
+        }
         mOverviewPanel = findViewById(R.id.overview_panel);
         mHotseat = findViewById(R.id.hotseat);
         mHotseat.setWorkspace(mWorkspace);
@@ -1321,7 +1336,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         mAllAppsController.setupViews(mScrimView, mAppsView);
 
         mWorkspace.getPageIndicator().setShouldAutoHide(
-                !shouldEnableMouseInteractionChanges(mWorkspace.getContext()));
+                !FlatWorkspace.isEnabled(this)
+                        && !shouldEnableMouseInteractionChanges(mWorkspace.getContext()));
         mWorkspace.getPageIndicator().setPaintColor(Themes.getAttrBoolean(
                 this, R.attr.isWorkspaceDarkText) ? Color.BLACK : Color.WHITE);
 
@@ -1615,6 +1631,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void toggleAllApps(boolean alreadyOnHome, boolean focusSearch) {
+        if (FlatWorkspace.isEnabled(this)) {
+            return;
+        }
         if (getStateManager().isInStableState(ALL_APPS)) {
             getStateManager().goToState(NORMAL, alreadyOnHome);
         } else {
@@ -1641,6 +1660,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void showAllAppsWithSelectedTabFromIntent(boolean alreadyOnHome, int tab) {
+        if (FlatWorkspace.isEnabled(this)) {
+            return;
+        }
         AbstractFloatingView.closeAllOpenViews(this);
         getStateManager().goToState(ALL_APPS, alreadyOnHome);
         if (mAppsView.isSearching()) {
@@ -2977,6 +2999,9 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     /** Opens the widget picker UI. Returns true if opened. */
     public boolean openWidgetPicker() {
+        if (FlatWorkspace.isEnabled(this)) {
+            return false;
+        }
         if (getPackageManager().isSafeMode()) {
             Toast.makeText(this, R.string.safemode_widget_error, Toast.LENGTH_SHORT).show();
             return false;
@@ -2996,6 +3021,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     /** Returns WidgetsFullSheet that was opened, or null if nothing was opened. */
     @VisibleForTesting
     public WidgetsFullSheet openWidgetsFullSheet() {
+        if (FlatWorkspace.isEnabled(this)) {
+            return null;
+        }
         AbstractFloatingView floatingView = AbstractFloatingView.getTopOpenViewWithType(
                 this, TYPE_WIDGETS_FULL_SHEET);
         if (floatingView != null) {

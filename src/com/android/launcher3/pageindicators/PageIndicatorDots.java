@@ -32,11 +32,14 @@ import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.IntProperty;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewOutlineProvider;
@@ -45,12 +48,18 @@ import android.view.animation.OvershootInterpolator;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
+import androidx.customview.widget.ExploreByTouchHelper;
 
 import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.Themes;
+
+import java.util.List;
+import java.util.function.IntConsumer;
 
 /**
  * {@link PageIndicator} which shows dots per page. The active page is shown with the current
@@ -124,6 +133,17 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
     private final float mCircleGap;
     private final boolean mIsRtl;
 
+    private float[] mDotCenters = new float[0];
+    private boolean mMarkersDrawn;
+    private int mClickedPage = -1;
+    private float mTouchDownX;
+    private float mTouchDownY;
+    private IntConsumer mPageClickListener;
+    private PageAccessibilityHelper mPageAccessibilityHelper;
+    private View mPageSwipeTarget;
+    private MotionEvent mDownEvent;
+    private boolean mForwardingSwipe;
+
     private int mNumPages;
     private int mActivePage;
     private int mTotalScroll;
@@ -175,6 +195,200 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                 : DOT_GAP_FACTOR * mDotRadius;
         setOutlineProvider(new MyOutlineProver());
         mIsRtl = Utilities.isRtl(getResources());
+    }
+
+    /** Enables pointer, keyboard and accessibility navigation between logical pages. */
+    public void setOnPageClickListener(@Nullable IntConsumer listener) {
+        mPageClickListener = listener;
+        if (listener != null && mPageAccessibilityHelper == null) {
+            mPageAccessibilityHelper = new PageAccessibilityHelper();
+        }
+        ViewCompat.setAccessibilityDelegate(
+                this, listener == null ? null : mPageAccessibilityHelper);
+        setFocusable(listener != null);
+        setOnClickListener(listener == null ? null : view -> {
+            int page = mClickedPage;
+            mClickedPage = -1;
+            selectPage(page);
+        });
+        setClickable(listener != null);
+    }
+
+    /** Receives horizontal gestures which begin over the page markers. */
+    public void setPageSwipeTarget(@Nullable View target) {
+        mPageSwipeTarget = target;
+    }
+
+    private boolean selectPage(int page) {
+        if (isEnabled() && mPageClickListener != null && page >= 0 && page < mNumPages) {
+            mPageClickListener.accept(page);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (mForwardingSwipe) {
+            forwardSwipe(event);
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                clearDownEvent();
+                mForwardingSwipe = false;
+            }
+            return true;
+        }
+        if (isClickable()) {
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    clearDownEvent();
+                    mDownEvent = MotionEvent.obtain(event);
+                    mTouchDownX = event.getX();
+                    mTouchDownY = event.getY();
+                    mClickedPage = getPageAt(mTouchDownX);
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                    float dx = Math.abs(event.getX() - mTouchDownX);
+                    float dy = Math.abs(event.getY() - mTouchDownY);
+                    if (dx > slop || dy > slop) mClickedPage = -1;
+                    if (mPageSwipeTarget != null && mDownEvent != null && dx > slop && dx > dy) {
+                        MotionEvent cancel = MotionEvent.obtain(event);
+                        cancel.setAction(MotionEvent.ACTION_CANCEL);
+                        super.onTouchEvent(cancel);
+                        cancel.recycle();
+                        mForwardingSwipe = true;
+                        forwardSwipe(mDownEvent);
+                        forwardSwipe(event);
+                        return true;
+                    }
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    mClickedPage = -1;
+                    clearDownEvent();
+                    break;
+            }
+        }
+        boolean handled = super.onTouchEvent(event);
+        if (action == MotionEvent.ACTION_UP) clearDownEvent();
+        return handled;
+    }
+
+    private void forwardSwipe(MotionEvent event) {
+        if (mPageSwipeTarget == null) return;
+        int[] source = new int[2];
+        int[] target = new int[2];
+        getLocationOnScreen(source);
+        mPageSwipeTarget.getLocationOnScreen(target);
+        MotionEvent forwarded = MotionEvent.obtain(event);
+        forwarded.offsetLocation(source[0] - target[0], source[1] - target[1]);
+        mPageSwipeTarget.onTouchEvent(forwarded);
+        forwarded.recycle();
+    }
+
+    private void clearDownEvent() {
+        if (mDownEvent != null) {
+            mDownEvent.recycle();
+            mDownEvent = null;
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        clearDownEvent();
+        mForwardingSwipe = false;
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    public boolean dispatchHoverEvent(MotionEvent event) {
+        return (mPageClickListener != null && mPageAccessibilityHelper.dispatchHoverEvent(event))
+                || super.dispatchHoverEvent(event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        return (mPageClickListener != null && mPageAccessibilityHelper.dispatchKeyEvent(event))
+                || super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, @Nullable Rect previous) {
+        super.onFocusChanged(gainFocus, direction, previous);
+        if (mPageClickListener != null) {
+            mPageAccessibilityHelper.onFocusChanged(gainFocus, direction, previous);
+        }
+    }
+
+    private Rect getPageBounds(int page) {
+        int visual = mIsRtl ? mNumPages - page - 1 : page;
+        int left = visual == 0 ? 0
+                : Math.round((mDotCenters[visual - 1] + mDotCenters[visual]) / 2);
+        int right = visual == mNumPages - 1 ? getWidth()
+                : Math.round((mDotCenters[visual] + mDotCenters[visual + 1]) / 2);
+        return new Rect(left, 0, Math.max(left + 1, right), Math.max(1, getHeight()));
+    }
+
+    private class PageAccessibilityHelper extends ExploreByTouchHelper {
+        PageAccessibilityHelper() {
+            super(PageIndicatorDots.this);
+        }
+
+        @Override
+        protected int getVirtualViewAt(float x, float y) {
+            int page = x >= 0 && x < getWidth() && y >= 0 && y < getHeight() ? getPageAt(x) : -1;
+            return page < 0 ? INVALID_ID : page;
+        }
+
+        @Override
+        protected void getVisibleVirtualViews(List<Integer> ids) {
+            if (mMarkersDrawn) {
+                for (int i = 0; i < mNumPages; i++) ids.add(i);
+            }
+        }
+
+        @Override
+        protected void onPopulateNodeForHost(AccessibilityNodeInfoCompat node) {
+            node.setClickable(false);
+            node.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK);
+        }
+
+        @Override
+        protected void onPopulateNodeForVirtualView(int id, AccessibilityNodeInfoCompat node) {
+            node.setContentDescription(getResources().getString(
+                    R.string.workspace_scroll_format, id + 1, mNumPages));
+            node.setClassName("android.widget.Button");
+            node.setEnabled(isEnabled());
+            node.setClickable(true);
+            node.setSelected(id == mActivePage);
+            node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK);
+            node.setBoundsInParent(id >= 0 && id < mNumPages
+                    ? getPageBounds(id) : new Rect(0, 0, 1, 1));
+        }
+
+        @Override
+        protected boolean onPerformActionForVirtualView(int id, int action, @Nullable Bundle args) {
+            return action == AccessibilityNodeInfoCompat.ACTION_CLICK && selectPage(id);
+        }
+
+        @Override
+        protected void onVirtualViewKeyboardFocusChanged(int id, boolean hasFocus) {
+            invalidate();
+        }
+    }
+
+    private int getPageAt(float x) {
+        if (!mMarkersDrawn || mNumPages < 2) {
+            return -1;
+        }
+        int closest = 0;
+        for (int i = 1; i < mNumPages; i++) {
+            if (Math.abs(x - mDotCenters[i]) < Math.abs(x - mDotCenters[closest])) {
+                closest = i;
+            }
+        }
+        return mIsRtl ? mNumPages - closest - 1 : closest;
     }
 
     @Override
@@ -437,10 +651,16 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                 }
             }
         }
+        if (mPageAccessibilityHelper != null) mPageAccessibilityHelper.invalidateRoot();
     }
 
     @Override
     public void setMarkersCount(int numMarkers) {
+        if (mNumPages != numMarkers) {
+            mDotCenters = new float[numMarkers];
+            mMarkersDrawn = false;
+            mClickedPage = -1;
+        }
         mNumPages = numMarkers;
 
         // If the last page gets removed we want to go to the previous page.
@@ -449,6 +669,7 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
             CURRENT_POSITION.set(this, (float) mActivePage);
         }
 
+        if (mPageAccessibilityHelper != null) mPageAccessibilityHelper.invalidateRoot();
         requestLayout();
     }
 
@@ -481,6 +702,7 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
 
     @Override
     protected void onDraw(Canvas canvas) {
+        mMarkersDrawn = false;
         if (mNumPages < 2) {
             return;
         }
@@ -545,6 +767,7 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                 }
             }
         } else {
+            mMarkersDrawn = alpha > 0;
 
             if (enableLauncherVisualRefresh()) {
                 int nonActiveAlpha = (int) (alpha * DOT_ALPHA_FRACTION);
@@ -625,6 +848,7 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                             invalidateOutline();
                         }
                     }
+                    mDotCenters[i] = sTempRect.centerX();
                     canvas.drawRoundRect(sTempRect, mDotRadius, mDotRadius, mPaginationPaint);
 
                     sTempRect.left = x;
@@ -634,6 +858,7 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                 // Here we draw the dots
                 mPaginationPaint.setAlpha((int) (alpha * DOT_ALPHA_FRACTION));
                 for (int i = 0; i < mNumPages; i++) {
+                    mDotCenters[i] = x;
                     canvas.drawCircle(x, y, mDotRadius, mPaginationPaint);
                     x += circleGap;
                 }
@@ -641,6 +866,19 @@ public class PageIndicatorDots extends View implements Insettable, PageIndicator
                 // Here we draw the current page indicator
                 mPaginationPaint.setAlpha(alpha);
                 canvas.drawRoundRect(getActiveRect(), mDotRadius, mDotRadius, mPaginationPaint);
+            }
+        }
+        if (mPageClickListener != null && mMarkersDrawn) {
+            int focused = mPageAccessibilityHelper.getKeyboardFocusedVirtualViewId();
+            if (focused >= 0 && focused < mNumPages) {
+                Rect bounds = getPageBounds(focused);
+                sTempRect.set(bounds);
+                sTempRect.inset(1, 1);
+                mPaginationPaint.setAlpha(alpha);
+                mPaginationPaint.setStyle(Style.STROKE);
+                mPaginationPaint.setStrokeWidth(getResources().getDisplayMetrics().density);
+                canvas.drawRoundRect(sTempRect, mDotRadius, mDotRadius, mPaginationPaint);
+                mPaginationPaint.setStyle(Style.FILL);
             }
         }
         // Reset the alpha so it doesn't become progressively more transparent each onDraw call

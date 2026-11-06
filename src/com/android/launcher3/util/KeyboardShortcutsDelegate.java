@@ -27,6 +27,7 @@ import android.view.KeyboardShortcutInfo;
 import android.view.Menu;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
@@ -54,7 +55,7 @@ public class KeyboardShortcutsDelegate {
     public void onProvideKeyboardShortcuts(
             List<KeyboardShortcutGroup> data, Menu menu, int deviceId) {
         ArrayList<KeyboardShortcutInfo> shortcutInfos = new ArrayList<>();
-        if (mLauncher.isInState(NORMAL)) {
+        if (mLauncher.isInState(NORMAL) && !FlatWorkspace.isEnabled(mLauncher)) {
             shortcutInfos.add(
                     new KeyboardShortcutInfo(mLauncher.getString(R.string.all_apps_button_label),
                             KeyEvent.KEYCODE_A, KeyEvent.META_CTRL_ON));
@@ -81,13 +82,13 @@ public class KeyboardShortcutsDelegate {
         if (event.hasModifiers(KeyEvent.META_CTRL_ON)) {
             switch (keyCode) {
                 case KeyEvent.KEYCODE_A:
-                    if (mLauncher.isInState(NORMAL)) {
+                    if (mLauncher.isInState(NORMAL) && !FlatWorkspace.isEnabled(mLauncher)) {
                         mLauncher.getStateManager().goToState(ALL_APPS);
                         return true;
                     }
                     break;
                 case KeyEvent.KEYCODE_W:
-                    if (mLauncher.isInState(NORMAL)) {
+                    if (mLauncher.isInState(NORMAL) && !FlatWorkspace.isEnabled(mLauncher)) {
                         mLauncher.openWidgetPicker();
                         return true;
                     }

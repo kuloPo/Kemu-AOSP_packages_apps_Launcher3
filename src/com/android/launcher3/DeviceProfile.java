@@ -129,6 +129,7 @@ public class DeviceProfile {
     private CalculatedCellSpec mResponsiveAllAppsCellSpec;
 
     public WorkspaceProfile mWorkspaceProfile;
+    public boolean isFlatWorkspace;
 
     private final FolderProfile mFolderProfile;
     public int folderIconSizePx;
@@ -291,6 +292,7 @@ public class DeviceProfile {
                         : Configuration.ORIENTATION_PORTRAIT,
                 windowBounds);
         final Resources res = context.getResources();
+        isFlatWorkspace = FlatWorkspace.isEnabled(context);
 
         overviewProfile = OverviewProfile.Factory.createOverviewProfile(res);
 
@@ -510,6 +512,9 @@ public class DeviceProfile {
                 /*hotseatBarSizePx*/hotseatBarSizePx
         );
 
+        if (isFlatWorkspace) {
+            mWorkspaceProfile = mWorkspaceProfile.forFlatWorkspace(inv, mDeviceProperties);
+        }
         updateIconSize(mWorkspaceProfile.getScale(), context);
 
         mBottomSheetProfile = BottomSheetProfile.Factory.createBottomSheetProfile(
@@ -584,7 +589,8 @@ public class DeviceProfile {
     }
 
     public void setWorkspaceIconProfile(WorkspaceProfile workspaceProfile) {
-        mWorkspaceProfile = workspaceProfile;
+        mWorkspaceProfile = isFlatWorkspace
+                ? workspaceProfile.forFlatWorkspace(inv, mDeviceProperties) : workspaceProfile;
     }
 
     /**
@@ -671,6 +677,11 @@ public class DeviceProfile {
 
     /** Updates hotseatCellHeightPx and hotseatBarSizePx */
     private void updateHotseatSizes(int hotseatIconSizePx) {
+        if (isFlatWorkspace) {
+            hotseatCellHeightPx = getIconSizeWithOverlap(hotseatIconSizePx);
+            hotseatBarSizePx = 0;
+            return;
+        }
         // Ensure there is enough space for folder icons, which have a slightly larger radius.
         hotseatCellHeightPx = getIconSizeWithOverlap(hotseatIconSizePx);
 
@@ -1019,7 +1030,7 @@ public class DeviceProfile {
      * Gets the number of panels within the workspace.
      */
     public int getPanelCount() {
-        return mDeviceProperties.isTwoPanels() ? 2 : 1;
+        return !isFlatWorkspace && mDeviceProperties.isTwoPanels() ? 2 : 1;
     }
 
     /**

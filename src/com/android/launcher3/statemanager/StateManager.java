@@ -257,6 +257,11 @@ public class StateManager<S extends BaseState<S>, T extends StatefulContainer<S>
 
     private void goToState(
             S state, boolean animated, long delay, AnimatorListener listener) {
+        S resolvedState = mContainer.resolveState(state);
+        if (resolvedState != state) {
+            goToState(resolvedState, animated, delay, listener);
+            return;
+        }
         StateManagerProtoLogProxy.logGoToState(
                 mState, state, getTrimmedStackTrace("StateManager.goToState"));
 

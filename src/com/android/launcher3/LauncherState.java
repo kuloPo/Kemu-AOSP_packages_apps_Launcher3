@@ -263,6 +263,9 @@ public abstract class LauncherState implements BaseState<LauncherState> {
 
     /** We should remove Launcher param after roll out refactorTaskbarUiState() flag. */
     public int getVisibleElements(LauncherUiState launcherUiState) {
+        if (launcherUiState.getDeviceProfileRef().getValue().isFlatWorkspace) {
+            return WORKSPACE_PAGE_INDICATOR;
+        }
         int elements = HOTSEAT_ICONS | WORKSPACE_PAGE_INDICATOR | VERTICAL_SWIPE_INDICATOR;
         // Floating search bar is visible in normal state except in landscape on phones.
         DeviceProperties dp = launcherUiState.getDeviceProfileRef().getValue()

@@ -54,7 +54,9 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.AppFilter;
 import com.android.launcher3.Flags;
+import com.android.launcher3.FlatWorkspace;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
@@ -174,6 +176,7 @@ public class LoaderTask implements Runnable {
     private final kotlin.Lazy<Map<Uri, HomeScreenFile>> mHomeScreenFilesQueryResult;
     private final FirstScreenBroadcastHelper mFirstScreenBroadcastHelper;
     private final SettingsCache mSettingsCache;
+    private final AppFilter mAppFilter;
 
     @AssistedInject
     protected LoaderTask(
@@ -197,7 +200,7 @@ public class LoaderTask implements Runnable {
             WorkspaceItemSpaceFinder workspaceItemSpaceFinder,
             HomeScreenFilesProvider homeScreenFilesProvider,
             FirstScreenBroadcastHelper firstScreenBroadcastHelper,
-            SettingsCache settingsCache) {
+            SettingsCache settingsCache, AppFilter appFilter) {
         mContext = context;
         mIDP = idp;
         mModel = model;
@@ -222,6 +225,7 @@ public class LoaderTask implements Runnable {
         mHomeScreenFilesQueryResult = homeScreenFilesProvider.query();
         mFirstScreenBroadcastHelper = firstScreenBroadcastHelper;
         mSettingsCache = settingsCache;
+        mAppFilter = appFilter;
         mUserManagerState = mUserCache.getUserManagerState();
     }
 
@@ -446,6 +450,8 @@ public class LoaderTask implements Runnable {
 
         Log.d(TAG, "loadWorkspace: loading default favorites if necessary");
         dbController.loadDefaultFavoritesIfNecessary();
+        FlatWorkspaceModel.reconcileIfNeeded(
+                mContext, dbController, mIDP, mUserManagerState, mAppFilter, mParams);
 
         synchronized (mBgDataModel) {
             mBgDataModel.clear();
@@ -484,7 +490,8 @@ public class LoaderTask implements Runnable {
                 if (mStopped) {
                     Log.w(TAG, "loadWorkspaceImpl: Loader stopped, skipping item processing");
                 } else {
-                    if (Flags.injectableModelItems()) {
+                    if (Flags.injectableModelItems()
+                            && !FlatWorkspace.isEnabled(mContext)) {
                         itemProcessor.processPreloadedItems(mExtraItemsProvider.get());
                     }
                     while (!mStopped && c.moveToNext()) {
