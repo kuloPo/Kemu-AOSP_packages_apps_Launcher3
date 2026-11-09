@@ -14,8 +14,8 @@
      limitations under the License.
 -->
 <resources>
-    <!-- Enabled by products which use the workspace as their application list. -->
-    <bool name="config_flat_workspace">false</bool>
+    <!-- Disabled by products which keep a separate application list. -->
+    <bool name="config_flat_workspace">true</bool>
     <string-array name="config_flat_workspace_system_apps">
         <item>com.android.settings</item>
     </string-array>
