@@ -79,6 +79,7 @@ import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.launcher3.util.rects.set
+import com.android.quickstep.KemuAppTabs
 import com.android.quickstep.FullscreenDrawParams
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
@@ -116,7 +117,6 @@ import com.android.quickstep.views.RecentsView.UNBOUND_TASK_VIEW_ID
 import com.android.quickstep.window.RecentsWindowFlags.enableOverviewOnConnectedDisplays
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
-import com.android.systemui.shared.system.ActivityManagerWrapper
 import com.android.wm.shell.shared.split.SplitScreenConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -1476,7 +1476,10 @@ constructor(
 
     /** Launch of the current task (both live and inactive tasks) with an animation. */
     fun launchWithAnimation(): RunnableList? {
-        return if (isRunningTask && recentsView?.remoteTargetHandles != null) {
+        // A live tile resumes in place. App tabs must restore the task onto its selected display.
+        val restoreOnTab = type == TaskViewType.SINGLE &&
+            firstTask?.let { KemuAppTabs.usesAppTabForRecents(context, it.key) } == true
+        return if (isRunningTask && recentsView?.remoteTargetHandles != null && !restoreOnTab) {
                 launchAsLiveTile(recentsView?.remoteTargetHandles!!)
             } else {
                 launchAsStaticTile()
@@ -1603,8 +1606,7 @@ constructor(
                 options.launchWindowingMode = WINDOWING_MODE_FULLSCREEN
             }
         if (
-            ActivityManagerWrapper.getInstance()
-                .startActivityFromRecents(firstTaskContainer.task.key, opts.options)
+            KemuAppTabs.startRecentTask(context, firstTaskContainer.task.key, opts.options)
         ) {
             Log.d(
                 TAG,
@@ -1687,7 +1689,7 @@ constructor(
                     failureListener.onTransitionFinished()
                 }
                 .apply {
-                    launchDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
+                    launchDisplayId = rootViewDisplayId
                     if (isQuickSwitch) {
                         setFreezeRecentTasksReordering()
                     }
@@ -1701,8 +1703,7 @@ constructor(
                     "startActivityFromRecents: ${taskIds.contentToString()}",
             )
             if (
-                !ActivityManagerWrapper.getInstance()
-                    .startActivityFromRecents(firstTaskContainer.task.key, opts)
+                !KemuAppTabs.startRecentTask(context, firstTaskContainer.task.key, opts)
             ) {
                 Log.d(TAG, "launchWithoutAnimation - task launch failed")
                 // If the call to start activity failed, then post the result immediately,

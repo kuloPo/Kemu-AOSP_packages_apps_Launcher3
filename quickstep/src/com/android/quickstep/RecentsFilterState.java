@@ -18,6 +18,9 @@ package com.android.quickstep;
 
 import static com.android.quickstep.window.RecentsWindowFlags.enableOverviewOnConnectedDisplays;
 
+import android.content.Context;
+import android.view.Display;
+
 import androidx.annotation.Nullable;
 
 import com.android.quickstep.util.DesksUtils;
@@ -124,13 +127,16 @@ public class RecentsFilterState {
      *                    unless the multiple desks feature is enabled, which allows empty desks.
      * @param displayId filter out tasks not on this display
      */
-    public static Predicate<GroupTask> getFilter(@Nullable String packageName, int displayId) {
+    public static Predicate<GroupTask> getFilter(Context context, @Nullable String packageName,
+            int displayId) {
         Predicate<GroupTask> filter = getDesktopTaskFilter();
         if (packageName != null) {
             filter = filter.and(groupTask -> groupTask.containsPackage(packageName));
         }
         if (enableOverviewOnConnectedDisplays()) {
-            filter = filter.and(groupTask -> groupTask.matchesDisplayId(displayId));
+            filter = filter.and(groupTask -> groupTask.matchesDisplayId(displayId)
+                    || (displayId == Display.DEFAULT_DISPLAY && KemuAppTabs.belongsToDesktopOverview(
+                            context, groupTask.getDisplayId())));
         }
         return filter;
     }

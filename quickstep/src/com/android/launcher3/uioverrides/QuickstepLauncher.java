@@ -192,6 +192,7 @@ import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.util.StartActivityParams;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.FloatingIconView;
+import com.android.quickstep.KemuAppTabs;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.OverviewCommandHelper;
@@ -816,6 +817,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     @Override
     public AtomicAnimationFactory<LauncherState> createAtomicAnimationFactory() {
         return new QuickstepAtomicAnimationFactory(this);
+    }
+
+    @Override
+    public void onTopResumedActivityChanged(boolean isTopResumedActivity) {
+        super.onTopResumedActivityChanged(isTopResumedActivity);
+        KemuAppTabs.onDesktopFocusChanged(this);
     }
 
     @Override

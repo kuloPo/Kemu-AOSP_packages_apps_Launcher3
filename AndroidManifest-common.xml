@@ -31,6 +31,9 @@
     with some minor changed based on the derivative app.
     -->
 
+    <permission android:name="com.android.launcher3.permission.OPEN_KEMU_APP_TAB"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.android.launcher3.permission.OPEN_KEMU_APP_TAB" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />

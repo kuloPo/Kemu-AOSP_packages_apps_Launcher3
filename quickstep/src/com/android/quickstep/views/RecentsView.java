@@ -120,6 +120,7 @@ import android.util.FloatProperty;
 import android.util.Log;
 import android.util.Pair;
 import android.util.SparseBooleanArray;
+import android.view.Display;
 import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -196,6 +197,7 @@ import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.OverviewComponentObserver;
 import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.RecentsAnimationTargets;
+import com.android.quickstep.KemuAppTabs;
 import com.android.quickstep.RecentsFilterState;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RemoteAnimationTargets;
@@ -697,7 +699,7 @@ public abstract class RecentsView<
                                 if (taskRemoved) {
                                     dismissTask(taskId, /*animate=*/true, /*removeTask=*/false);
                                 }
-                            }, RecentsFilterState.getFilter(mFilterState.getPackageNameToFilter(),
+                            }, RecentsFilterState.getFilter(getContext(), mFilterState.getPackageNameToFilter(),
                                     mContainer.getDisplayId()));
                         }
                     }));
@@ -709,7 +711,9 @@ public abstract class RecentsView<
             if (!mHandleTaskStackChanges) {
                 return;
             }
-            if (newDisplayId != mContainer.getDisplayId()) {
+            if (newDisplayId != mContainer.getDisplayId()
+                    && !(mContainer.getDisplayId() == Display.DEFAULT_DISPLAY
+                            && KemuAppTabs.belongsToDesktopOverview(getContext(), newDisplayId))) {
                 dismissTask(taskId, /*animate=*/ true, /*removeTask=*/ false);
             }
         }
@@ -2979,7 +2983,7 @@ public abstract class RecentsView<
     public void reloadIfNeeded() {
         if (!mModel.isTaskListValid(mAppliedTaskListChangeId)) {
             mModel.getTasks(this::applyLoadPlan, RecentsFilterState
-                    .getFilter(mFilterState.getPackageNameToFilter(), mContainer.getDisplayId()));
+                    .getFilter(getContext(), mFilterState.getPackageNameToFilter(), mContainer.getDisplayId()));
             Log.d(TAG, "reloadIfNeeded - getTasks: " + mAppliedTaskListChangeId);
             if (enableRefactorTaskThumbnail()) {
                 mRecentsViewModel.refreshAllTaskData();

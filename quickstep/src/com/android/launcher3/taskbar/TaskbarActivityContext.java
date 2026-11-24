@@ -171,6 +171,7 @@ import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.quickstep.KemuAppTabs;
 import com.android.quickstep.NavHandle;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SystemUiProxy;
@@ -1862,8 +1863,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         makeDefaultActivityOptions(SPLASH_SCREEN_STYLE_UNDEFINED).options;
                 activityOptions.setRemoteTransition(remoteTransition);
 
-                ActivityManagerWrapper.getInstance().startActivityFromRecents(
-                        singleTask.getTask().key, activityOptions);
+                KemuAppTabs.startRecentTask(this, singleTask.getTask().key, activityOptions);
             });
             return;
         }
@@ -2016,12 +2016,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             // TODO(b/216683257): Use startActivityForResult for search results that require it.
             if (taskInRecents != null) {
                 // Re launch instance from recents
-                if (ActivityManagerWrapper.getInstance()
-                        .startActivityFromRecents(taskInRecents.key, opts.options)) {
+                if (KemuAppTabs.startRecentTask(this, taskInRecents.key, opts.options)) {
                     mControllers.uiController.getRecentsView()
                             .addSideTaskLaunchCallback(opts.onEndCallback);
                     return;
                 }
+                if (KemuAppTabs.usesAppTabForRecents(this, taskInRecents.key)) return;
             }
             if (shouldLaunchInDesktop(displayId, info)) {
                 launchDesktopApp(intent, info, displayId);

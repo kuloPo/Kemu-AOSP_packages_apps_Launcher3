@@ -513,13 +513,32 @@ public interface ActivityContext extends SavedStateRegistryOwner {
                 : makeDefaultActivityOptions(item != null && item.animationType == DEFAULT_NO_ICON
                         ? SPLASH_SCREEN_STYLE_SOLID_COLOR : -1 /* SPLASH_SCREEN_STYLE_UNDEFINED */);
         UserHandle user = item == null ? null : item.user;
-        Bundle optsBundle = options.toBundle();
         // Prepare intent
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (v != null) {
             intent.setSourceBounds(Utilities.getViewBounds(v));
         }
         try {
+            if (item != null && Process.myUserHandle().equals(user)
+                    && (isShortcut || item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION)
+                    && android.os.SystemProperties.getInt("ro.kemu.app_tabs.version", 0) == 2) {
+                String pkg = intent.getComponent() == null
+                        ? intent.getPackage() : intent.getComponent().getPackageName();
+                if (pkg != null) {
+                    Bundle request = new Bundle();
+                    request.putBoolean("shortcut", isShortcut || !Intent.ACTION_MAIN.equals(intent.getAction()));
+                    Bundle reply = context.getContentResolver().call(
+                            android.net.Uri.parse("content://com.android.emulator.multidisplay.tabs"),
+                            "open", pkg, request);
+                    if (reply != null && reply.getBoolean("handled")) {
+                        return null;
+                    }
+                    if (reply != null && reply.containsKey("display")) {
+                        options.options.setLaunchDisplayId(reply.getInt("display"));
+                    }
+                }
+            }
+            Bundle optsBundle = options.toBundle();
             if (isShortcut) {
                 String id = ((WorkspaceItemInfo) item).getDeepShortcutId();
                 String packageName = intent.getPackage();

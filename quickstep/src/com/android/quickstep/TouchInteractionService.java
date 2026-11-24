@@ -253,7 +253,11 @@ public class TouchInteractionService extends Service {
                     }
                 }
                 TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
-                tis.mOverviewCommandHelper.addCommand(CommandType.TOGGLE, displayId);
+                if (KemuAppTabs.focusDesktopForOverview(tis)) {
+                    tis.mOverviewCommandHelper.addCommand(CommandType.SHOW_WITH_FOCUS, DEFAULT_DISPLAY);
+                } else {
+                    tis.mOverviewCommandHelper.addCommand(CommandType.TOGGLE, displayId);
+                }
             });
         }
 
@@ -276,6 +280,8 @@ public class TouchInteractionService extends Service {
                 if (triggeredFromAltTab) {
                     TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
                     tis.mOverviewCommandHelper.addCommand(CommandType.SHOW_ALT_TAB, displayId);
+                } else if (KemuAppTabs.focusDesktopForOverview(tis)) {
+                    tis.mOverviewCommandHelper.addCommand(CommandType.SHOW_WITH_FOCUS, DEFAULT_DISPLAY);
                 } else {
                     tis.mOverviewCommandHelper.addCommand(
                             enableMetaTabToggleInOverview()
