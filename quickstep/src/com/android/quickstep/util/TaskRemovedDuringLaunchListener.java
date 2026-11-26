@@ -74,7 +74,8 @@ public class TaskRemovedDuringLaunchListener {
     /**
      * Unregisters the failure listener.
      */
-    private void unregister() {
+    public void unregister() {
+        if (mContainer == null) return;
         mContainer.removeEventCallback(EVENT_STOPPED, mUnregisterCallback);
         mContainer.removeEventCallback(EVENT_RESUMED, mResumeCallback);
         mContainer.removeEventCallback(EVENT_DESTROYED, mUnregisterCallback);

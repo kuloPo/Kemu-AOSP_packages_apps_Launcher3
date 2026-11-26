@@ -70,6 +70,7 @@ import com.android.launcher3.util.MultiPropertyFactory
 import com.android.launcher3.util.MultiValueAlpha
 import com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview
 import com.android.launcher3.util.OverviewReleaseFlags.enableOverviewIconMenu
+import com.android.launcher3.util.ActivityOptionsWrapper
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
@@ -116,6 +117,7 @@ import com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED
 import com.android.quickstep.views.RecentsView.UNBOUND_TASK_VIEW_ID
 import com.android.quickstep.window.RecentsWindowFlags.enableOverviewOnConnectedDisplays
 import com.android.systemui.shared.recents.model.Task
+import com.android.systemui.shared.system.ActivityManagerWrapper
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.wm.shell.shared.split.SplitScreenConstants
 import kotlinx.coroutines.CoroutineScope
@@ -1605,9 +1607,29 @@ constructor(
                 // sure fullscreen apps remain fullscreen we set the windowing mode explicitly.
                 options.launchWindowingMode = WINDOWING_MODE_FULLSCREEN
             }
-        if (
-            KemuAppTabs.startRecentTask(context, firstTaskContainer.task.key, opts.options)
-        ) {
+        val key = firstTaskContainer.task.key
+        if (KemuAppTabs.usesAppTabForRecents(context, key)) {
+            val pending = RunnableList()
+            KemuAppTabs.startRecentTab(context, key, opts.options) { result ->
+                if (result == KemuAppTabs.LaunchResult.STARTED) {
+                    val callbacks = finishStaticTileLaunch(true, opts)
+                    if (callbacks != null) callbacks.add(pending::executeAllAndDestroy)
+                    else pending.executeAllAndDestroy()
+                } else {
+                    if (result == KemuAppTabs.LaunchResult.FAILED) notifyTaskLaunchFailed("launchAsStaticTile")
+                    opts.onEndCallback.executeAllAndDestroy()
+                    pending.executeAllAndDestroy()
+                }
+            }
+            return pending
+        }
+        return finishStaticTileLaunch(
+            ActivityManagerWrapper.getInstance().startActivityFromRecents(key, opts.options), opts
+        )
+    }
+
+    private fun finishStaticTileLaunch(launched: Boolean, opts: ActivityOptionsWrapper): RunnableList? {
+        if (launched) {
             Log.d(
                 TAG,
                 "launchAsStaticTile - startActivityFromRecents: ${taskIds.contentToString()}",
@@ -1702,17 +1724,25 @@ constructor(
                 "launchWithoutAnimation(isQuickSwitch: $isQuickSwitch) - " +
                     "startActivityFromRecents: ${taskIds.contentToString()}",
             )
-            if (
-                !KemuAppTabs.startRecentTask(context, firstTaskContainer.task.key, opts)
-            ) {
-                Log.d(TAG, "launchWithoutAnimation - task launch failed")
-                // If the call to start activity failed, then post the result immediately,
-                // otherwise, wait for the animation start callback from the activity options
-                // above
-                Executors.MAIN_EXECUTOR.post {
-                    notifyTaskLaunchFailed("launchTask")
-                    callbackWithLogging(false)
+            val key = firstTaskContainer.task.key
+            val completed = { launched: Boolean ->
+                if (!launched) {
+                    Executors.MAIN_EXECUTOR.execute {
+                        notifyTaskLaunchFailed("launchTask")
+                        callbackWithLogging(false)
+                    }
                 }
+            }
+            if (KemuAppTabs.usesAppTabForRecents(context, key)) {
+                KemuAppTabs.startRecentTab(context, key, opts) { result ->
+                    if (result != KemuAppTabs.LaunchResult.STARTED) {
+                        failureListener.unregister()
+                        if (result == KemuAppTabs.LaunchResult.FAILED) notifyTaskLaunchFailed("launchTask")
+                        callbackWithLogging(false)
+                    }
+                }
+            } else {
+                completed(ActivityManagerWrapper.getInstance().startActivityFromRecents(key, opts))
             }
         }
     }

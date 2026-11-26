@@ -9,23 +9,20 @@ import android.hardware.display.DisplayManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.RemoteException;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.util.Log;
 import android.view.Display;
 
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.KemuTabLaunch;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+
+import java.util.function.Consumer;
 
 /** Keeps Quickstep on the desktop and app tasks on their Kemu tab displays. */
 public final class KemuAppTabs {
     private KemuAppTabs() { }
-
-    private static boolean enabled() {
-        return SystemProperties.getInt("ro.kemu.app_tabs.version", 0) == 2
-                && SystemProperties.getBoolean("vendor.qemu.kemu.app_tabs", false);
-    }
 
     private static boolean isTab(Context context, int displayId) {
         if (displayId <= Display.DEFAULT_DISPLAY) return false;
@@ -35,7 +32,7 @@ public final class KemuAppTabs {
     }
 
     public static boolean usesAppTabForRecents(Context context, Task.TaskKey task) {
-        if (!enabled() || context.getDisplayId() != Display.DEFAULT_DISPLAY
+        if (!KemuTabLaunch.enabled() || context.getDisplayId() != Display.DEFAULT_DISPLAY
                 || task.userId != UserHandle.USER_SYSTEM
                 || (task.topActivityType != WindowConfiguration.ACTIVITY_TYPE_STANDARD
                     && task.topActivityType != WindowConfiguration.ACTIVITY_TYPE_UNDEFINED)) {
@@ -53,26 +50,29 @@ public final class KemuAppTabs {
                 || context.getPackageManager().getLaunchIntentForPackage(pkg) != null;
     }
 
-    public static boolean startRecentTask(Context context, Task.TaskKey task, ActivityOptions options) {
-        if (usesAppTabForRecents(context, task)) {
-            Bundle request = new Bundle();
-            request.putInt("recentTaskId", task.id);
-            try {
-                Bundle target = context.getContentResolver().call(
-                        Uri.parse("content://com.android.emulator.multidisplay.tabs"),
-                        "open", task.getPackageName(), request);
-                if (target == null || !target.containsKey("display")) return false;
-                options.setLaunchDisplayId(target.getInt("display"));
-            } catch (IllegalArgumentException e) {
-                Log.w("KemuTabs", "Cannot resolve the tab for recent task " + task.id, e);
-                return false;
+    public enum LaunchResult { STARTED, HANDLED, FAILED }
+
+    public static void startRecentTab(Context context, Task.TaskKey task, ActivityOptions options,
+            Consumer<LaunchResult> completed) {
+        Bundle request = new Bundle();
+        request.putInt("recentTaskId", task.id);
+        KemuTabLaunch.open(context, task.getPackageName(), request, reply -> {
+            if (reply != null && reply.getBoolean("handled")) {
+                completed.accept(LaunchResult.HANDLED);
+                return;
             }
-        }
-        return ActivityManagerWrapper.getInstance().startActivityFromRecents(task, options);
+            if (reply == null || !reply.containsKey("display")) {
+                completed.accept(LaunchResult.FAILED);
+                return;
+            }
+            options.setLaunchDisplayId(reply.getInt("display"));
+            completed.accept(ActivityManagerWrapper.getInstance().startActivityFromRecents(task, options)
+                    ? LaunchResult.STARTED : LaunchResult.FAILED);
+        });
     }
 
     public static void onDesktopFocusChanged(Context context) {
-        if (!enabled()) return;
+        if (!KemuTabLaunch.enabled()) return;
         // TaskStackListener reports focus within each display. The top resumed activity
         // also changes when Android switches between displays with unchanged task stacks.
         Executors.UI_HELPER_EXECUTOR.execute(() -> {
@@ -80,14 +80,14 @@ public final class KemuAppTabs {
                 context.getContentResolver().call(
                         Uri.parse("content://com.android.emulator.multidisplay.tabs"),
                         "refreshFocus", null, null);
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
                 Log.w("KemuTabs", "Tab provider unavailable", e);
             }
         });
     }
 
     static boolean focusDesktopForOverview(Context context) {
-        if (!enabled()) return false;
+        if (!KemuTabLaunch.enabled()) return false;
         try {
             var service = ActivityTaskManager.getService();
             var focused = service.getFocusedRootTaskInfo();
@@ -101,6 +101,6 @@ public final class KemuAppTabs {
     }
 
     public static boolean belongsToDesktopOverview(Context context, int taskDisplay) {
-        return taskDisplay > Display.DEFAULT_DISPLAY && enabled() && isTab(context, taskDisplay);
+        return taskDisplay > Display.DEFAULT_DISPLAY && KemuTabLaunch.enabled() && isTab(context, taskDisplay);
     }
 }

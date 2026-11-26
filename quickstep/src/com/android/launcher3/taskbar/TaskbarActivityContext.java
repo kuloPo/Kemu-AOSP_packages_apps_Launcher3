@@ -1863,7 +1863,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         makeDefaultActivityOptions(SPLASH_SCREEN_STYLE_UNDEFINED).options;
                 activityOptions.setRemoteTransition(remoteTransition);
 
-                KemuAppTabs.startRecentTask(this, singleTask.getTask().key, activityOptions);
+                Task.TaskKey key = singleTask.getTask().key;
+                if (KemuAppTabs.usesAppTabForRecents(this, key)) {
+                    KemuAppTabs.startRecentTab(this, key, activityOptions, launched -> {});
+                } else {
+                    ActivityManagerWrapper.getInstance().startActivityFromRecents(key, activityOptions);
+                }
             });
             return;
         }
@@ -2016,12 +2021,19 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             // TODO(b/216683257): Use startActivityForResult for search results that require it.
             if (taskInRecents != null) {
                 // Re launch instance from recents
-                if (KemuAppTabs.startRecentTask(this, taskInRecents.key, opts.options)) {
+                if (KemuAppTabs.usesAppTabForRecents(this, taskInRecents.key)) {
+                    KemuAppTabs.startRecentTab(this, taskInRecents.key, opts.options, launched -> {
+                        if (launched == KemuAppTabs.LaunchResult.STARTED) mControllers.uiController.getRecentsView()
+                                .addSideTaskLaunchCallback(opts.onEndCallback);
+                        else opts.onEndCallback.executeAllAndDestroy();
+                    });
+                    return;
+                }
+                if (ActivityManagerWrapper.getInstance().startActivityFromRecents(taskInRecents.key, opts.options)) {
                     mControllers.uiController.getRecentsView()
                             .addSideTaskLaunchCallback(opts.onEndCallback);
                     return;
                 }
-                if (KemuAppTabs.usesAppTabForRecents(this, taskInRecents.key)) return;
             }
             if (shouldLaunchInDesktop(displayId, info)) {
                 launchDesktopApp(intent, info, displayId);

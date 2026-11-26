@@ -87,6 +87,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ApplicationInfoWrapper;
+import com.android.launcher3.util.KemuTabLaunch;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.Preconditions;
@@ -518,26 +519,32 @@ public interface ActivityContext extends SavedStateRegistryOwner {
         if (v != null) {
             intent.setSourceBounds(Utilities.getViewBounds(v));
         }
-        try {
-            if (item != null && Process.myUserHandle().equals(user)
-                    && (isShortcut || item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION)
-                    && android.os.SystemProperties.getInt("ro.kemu.app_tabs.version", 0) == 2) {
-                String pkg = intent.getComponent() == null
-                        ? intent.getPackage() : intent.getComponent().getPackageName();
-                if (pkg != null) {
-                    Bundle request = new Bundle();
-                    request.putBoolean("shortcut", isShortcut || !Intent.ACTION_MAIN.equals(intent.getAction()));
-                    Bundle reply = context.getContentResolver().call(
-                            android.net.Uri.parse("content://com.android.emulator.multidisplay.tabs"),
-                            "open", pkg, request);
-                    if (reply != null && reply.getBoolean("handled")) {
-                        return null;
+        if (item != null && Process.myUserHandle().equals(user) && KemuTabLaunch.enabled()
+                && (isShortcut || item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION)) {
+            String pkg = intent.getComponent() == null
+                    ? intent.getPackage() : intent.getComponent().getPackageName();
+            if (pkg != null) {
+                Intent launchIntent = new Intent(intent);
+                Bundle request = new Bundle();
+                request.putBoolean("shortcut", isShortcut || !Intent.ACTION_MAIN.equals(intent.getAction()));
+                KemuTabLaunch.open(context, pkg, request, reply -> {
+                    if (reply == null) {
+                        Toast.makeText(context, R.string.activity_not_available, Toast.LENGTH_SHORT).show();
+                    } else if (!reply.getBoolean("handled")) {
+                        if (reply.containsKey("display")) options.options.setLaunchDisplayId(reply.getInt("display"));
+                        if (startPreparedActivity(context, launchIntent, item, isShortcut, user, options) != null) return;
                     }
-                    if (reply != null && reply.containsKey("display")) {
-                        options.options.setLaunchDisplayId(reply.getInt("display"));
-                    }
-                }
+                    options.onEndCallback.executeAllAndDestroy();
+                });
+                return options.onEndCallback;
             }
+        }
+        return startPreparedActivity(context, intent, item, isShortcut, user, options);
+    }
+
+    private RunnableList startPreparedActivity(Context context, Intent intent, @Nullable ItemInfo item,
+            boolean isShortcut, UserHandle user, ActivityOptionsWrapper options) {
+        try {
             Bundle optsBundle = options.toBundle();
             if (isShortcut) {
                 String id = ((WorkspaceItemInfo) item).getDeepShortcutId();
